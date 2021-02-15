@@ -6,7 +6,7 @@ It is modified to work with 8bit data bus and 1 bit color (B/W only) mode.
 Adafruit invests time and resources providing this open source code, please support Adafruit and open-source hardware by purchasing products from Adafruit!
 
 # Dependencies
-  These displays use Parallel Bus, and the library uses 8-bit width to communicate with the display. The control signal pins uses Arduino HAL like pinMode() or digitalWrite() function, but for the performance sake, the 8-bit data bus and WR pin were controlled directly by pin registers GPIOA and assumed the bus are GPIO0 ~ 7 and WR is GPIO 28. Which is highly customized for Sparkfun Artemis Module (Apoll3b MCU). 
+  The library uses 8-bit width parallel Bus to communicate with the display. The control signal pins uses Arduino HAL like pinMode() or digitalWrite() function, but for the performance sake, the 8-bit data bus and WR pin were controlled directly by pin registers which is highly customized for Sparkfun Artemis Module (Apoll3b MCU). It is assuming the bus are GPIO0 ~ 7 and WR is GPIO 28. 
 
 * [Adafruit GFX Library](https://github.com/adafruit/Adafruit-GFX-Library)
 
