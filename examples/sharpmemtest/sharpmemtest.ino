@@ -1,43 +1,22 @@
-/*********************************************************************
-This is an example sketch for our Monochrome SHARP Memory Displays
-
-  Pick one up today in the adafruit shop!
-  ------> http://www.adafruit.com/products/1393
-
-These displays use SPI to communicate, 3 pins are required to
-interface
-
-Adafruit invests time and resources providing this open source code,
-please support Adafruit and open-source hardware by purchasing
-products from Adafruit!
-
-Written by Limor Fried/Ladyada  for Adafruit Industries.
-BSD license, check license.txt for more information
-All text above, must be included in any redistribution
-*********************************************************************/
-
 #include <Adafruit_GFX.h>
-#include <Adafruit_SharpMem.h>
+#include <SharpMem_8bit.h>
 
-// any pins can be used
-#define SHARP_SCK  13
-#define SHARP_MOSI 11
-#define SHARP_SS   10
+#define reset 28
+#define rs 34
+#define cs 29
+#define wr 26
+#define rd 25
+#define ack 32
+#define en 24
+#define sync 33
 
-// Set the size of the display here, e.g. 144x168!
-Adafruit_SharpMem display(SHARP_SCK, SHARP_MOSI, SHARP_SS, 144, 168);
-// The currently-available SHARP Memory Display (144x168 pixels)
-// requires > 4K of microcontroller RAM; it WILL NOT WORK on Arduino Uno
-// or other <4K "classic" devices!  The original display (96x96 pixels)
-// does work there, but is no longer produced.
+Adafruit_SharpMem display(reset, rs, cs, wr, rd, ack, en, sync);
 
 #define BLACK 0
 #define WHITE 1
-
 int minorHalfSize; // 1/2 of lesser of display width or height
 
-void setup(void)
-{
+void setup() {
   Serial.begin(9600);
   Serial.println("Hello!");
 
@@ -48,12 +27,6 @@ void setup(void)
   // Several shapes are drawn centered on the screen.  Calculate 1/2 of
   // lesser of display width or height, this is used repeatedly later.
   minorHalfSize = min(display.width(), display.height()) / 2;
-
-  // draw a single pixel
-  display.drawPixel(10, 10, BLACK);
-  display.refresh();
-  delay(500);
-  display.clearDisplay();
 
   // draw many lines
   testdrawline();
@@ -128,7 +101,6 @@ void loop(void)
   }
 }
 
-///
 
 void testdrawline() {
   for (int i=0; i<display.width(); i+=4) {
@@ -240,5 +212,3 @@ void testdrawchar(void) {
   }
   display.refresh();
 }
-
-

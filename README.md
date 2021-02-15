@@ -1,34 +1,12 @@
-# Adafruit SHARP Memory Display [![Build Status](https://github.com/adafruit/Adafruit_SHARP_Memory_Display/workflows/Arduino%20Library%20CI/badge.svg)](https://github.com/adafruit/Adafruit_SHARP_Memory_Display/actions)
+# Modified Adafruit SHARP Memory Display for LS060S2UD01 6" Sharp Memory LCD
 
-This is the Adafruit SHARP Memory Display Arduino Library for Arduino
-
-Tested and works great with the Adafruit SHARP Memory Display Breakout Board. Pick one up today in the adafruit shop!
- http://www.adafruit.com/products/1393
+This is the modified version of Adafruit SHARP Memory Display Arduino Library for Arduino(Sparkfun Artemis Module) and LS060S2UD01
+It is modified to work with 8bit data bus and 1 bit color (B/W only) mode.
 
 Adafruit invests time and resources providing this open source code, please support Adafruit and open-source hardware by purchasing products from Adafruit!
 
 # Dependencies
-  These displays use SPI to communicate, 3 pins are required to  
-interface
+  These displays use Parallel Bus, and the library uses 8-bit width to communicate with the display. The control signal pins uses Arduino HAL like pinMode() or digitalWrite() function, but for the performance sake, the 8-bit data bus and WR pin were controlled directly by pin registers GPIOA and assumed the bus are GPIO0 ~ 7 and WR is GPIO 28. Which is highly customized for Sparkfun Artemis Module (Apoll3b MCU). 
 
 * [Adafruit GFX Library](https://github.com/adafruit/Adafruit-GFX-Library)
 
-# Contributing
-
-Contributions are welcome! Please read our [Code of Conduct](https://github.com/adafruit/Adafruit_SHARP_Memory_Display/blob/master/CODE_OF_CONDUCT.md>)
-before contributing to help this project stay welcoming.
-
-## Documentation and doxygen
-Documentation is produced by doxygen. Contributions should include documentation for any new code added.
-
-Some examples of how to use doxygen can be found in these guide pages:
-
-https://learn.adafruit.com/the-well-automated-arduino-library/doxygen
-
-https://learn.adafruit.com/the-well-automated-arduino-library/doxygen-tips
-
-Written by Limor Fried & Kevin Townsend for Adafruit Industries.
-BSD license, check license.txt for more information
-All text above, and the splash screen must be included in any redistribution
-
-To install, use the Arduino Library Manager and search for "Adafruit SHARP Memory Display" and install the library.

@@ -16,7 +16,12 @@ BSD license, check license.txt for more information
 All text above, and the splash screen must be included in any redistribution
 *********************************************************************/
 
-#include "Adafruit_SharpMem.h"
+#include "SharpMem_8bit.h"
+#include "Arduino.h"
+#include "am_mcu_apollo.h"
+#include "am_bsp.h"
+#include "am_util.h"
+
 
 #ifndef _swap_int16_t
 #define _swap_int16_t(a, b)                                                    \
@@ -35,70 +40,23 @@ All text above, and the splash screen must be included in any redistribution
   }
 #endif
 
-/**************************************************************************
-    Sharp Memory Display Connector
-    -----------------------------------------------------------------------
-    Pin   Function        Notes
-    ===   ==============  ===============================
-      1   VIN             3.3-5.0V (into LDO supply)
-      2   3V3             3.3V out
-      3   GND
-      4   SCLK            Serial Clock
-      5   MOSI            Serial Data Input
-      6   CS              Serial Chip Select
-      9   EXTMODE         COM Inversion Select (Low = SW clock/serial)
-      7   EXTCOMIN        External COM Inversion Signal
-      8   DISP            Display On(High)/Off(Low)
+volatile uint32_t *wtsb = (volatile uint32_t *)0x40010094;
+volatile uint32_t *wtcb = (volatile uint32_t *)0x4001009C;
+volatile uint32_t *wtsa = (volatile uint32_t *)0x40010090;
+volatile uint32_t *wtca = (volatile uint32_t *)0x40010098;
 
- **************************************************************************/
-
-#define TOGGLE_VCOM                                                            \
-  do {                                                                         \
-    _sharpmem_vcom = _sharpmem_vcom ? 0x00 : SHARPMEM_BIT_VCOM;                \
-  } while (0);
-
-/**
- * @brief Construct a new Adafruit_SharpMem object with software SPI
- *
- * @param clk The clock pin
- * @param mosi The MOSI pin
- * @param cs The display chip select pin - **NOTE** this is ACTIVE HIGH!
- * @param width The display width
- * @param height The display height
- * @param freq The SPI clock frequency desired (unlikely to be that fast in soft
- * spi mode!)
- */
-Adafruit_SharpMem::Adafruit_SharpMem(uint8_t clk, uint8_t mosi, uint8_t cs,
-                                     uint16_t width, uint16_t height,
-                                     uint32_t freq)
+Adafruit_SharpMem::Adafruit_SharpMem(uint8_t reset, uint8_t rs, uint8_t cs, uint8_t wr, uint8_t rd, uint8_t ack, uint8_t en, uint8_t sync,
+                                     uint16_t width, uint16_t height)
     : Adafruit_GFX(width, height) {
-  _cs = cs;
-  if (spidev) {
-    delete spidev;
-  }
-  spidev =
-      new Adafruit_SPIDevice(cs, clk, -1, mosi, freq, SPI_BITORDER_LSBFIRST);
-}
+  _reset = reset; 
+  _rs = rs; 
+  _cs = cs; 
+  _wr = wr; 
+  _rd = rd; 
+  _ack = ack; 
+  _en = en; 
+  _sync = sync;
 
-/**
- * @brief Construct a new Adafruit_SharpMem object with hardware SPI
- *
- * @param theSPI Pointer to hardware SPI device you want to use
- * @param cs The display chip select pin - **NOTE** this is ACTIVE HIGH!
- * @param width The display width
- * @param height The display height
- * @param freq The SPI clock frequency desired
- */
-Adafruit_SharpMem::Adafruit_SharpMem(SPIClass *theSPI, uint8_t cs,
-                                     uint16_t width, uint16_t height,
-                                     uint32_t freq)
-    : Adafruit_GFX(width, height) {
-  _cs = cs;
-  if (spidev) {
-    delete spidev;
-  }
-  spidev = new Adafruit_SPIDevice(cs, freq, SPI_BITORDER_LSBFIRST, SPI_MODE0,
-                                  theSPI);
 }
 
 /**
@@ -108,31 +66,56 @@ Adafruit_SharpMem::Adafruit_SharpMem(SPIClass *theSPI, uint8_t cs,
  * @return boolean true: success false: failure
  */
 boolean Adafruit_SharpMem::begin(void) {
-  if (!spidev->begin()) {
-    return false;
-  }
-  // this display is weird in that _cs is active HIGH not LOW like every other
-  // SPI device
-  digitalWrite(_cs, LOW);
-
-  // Set the vcom bit to a defined state
-  _sharpmem_vcom = SHARPMEM_BIT_VCOM;
 
   sharpmem_buffer = (uint8_t *)malloc((WIDTH * HEIGHT) / 8);
 
   if (!sharpmem_buffer)
     return false;
 
-  setRotation(0);
+  pinMode(_reset,OUTPUT);
+  digitalWrite(_reset,HIGH);
+  pinMode(_rs,OUTPUT);
+  pinMode(_cs,OUTPUT);
+  pinMode(_wr,OUTPUT);
+  pinMode(_rd,OUTPUT);
+  pinMode(_ack,INPUT_PULLUP);
+  pinMode(_en,OUTPUT);
+  pinMode(_sync,INPUT_PULLUP);
+
+  digitalWrite(_rs,LOW);
+  digitalWrite(_cs,HIGH);
+  digitalWrite(_rd,HIGH);
+  digitalWrite(_wr, HIGH);
+  digitalWrite(_en,HIGH);
+
+  for (int i = 0; i <= 7; ++i)
+  {
+    //Not sure why this is not working using Arduino HAL
+    //pinMode(i,OUTPUT);
+    //digitalWrite(i,LOW);
+    am_hal_gpio_pinconfig(i,g_AM_HAL_GPIO_OUTPUT);
+    am_hal_gpio_state_write(i,AM_HAL_GPIO_OUTPUT_CLEAR);
+    
+  }
+
+  digitalWrite(_reset,LOW);
+  delay(100);
+  digitalWrite(_reset,HIGH);
+  delay(100);
+
+  enableDisplay();
+
+  rotationMode(3);
+  panelBits(SHARPMEM_1BIT);
 
   return true;
 }
 
 // 1<<n is a costly operation on AVR -- table usu. smaller & faster
-static const uint8_t PROGMEM set[] = {1, 2, 4, 8, 16, 32, 64, 128},
-                             clr[] = {(uint8_t)~1,  (uint8_t)~2,  (uint8_t)~4,
-                                      (uint8_t)~8,  (uint8_t)~16, (uint8_t)~32,
-                                      (uint8_t)~64, (uint8_t)~128};
+static const uint8_t PROGMEM set[] = {128, 64, 32, 16, 8, 4, 2, 1},
+                             clr[] = {(uint8_t)~128,  (uint8_t)~64,  (uint8_t)~32,
+                                      (uint8_t)~16,  (uint8_t)~8, (uint8_t)~4,
+                                      (uint8_t)~2, (uint8_t)~1};
 
 /**************************************************************************/
 /*!
@@ -214,18 +197,8 @@ uint8_t Adafruit_SharpMem::getPixel(uint16_t x, uint16_t y) {
 */
 /**************************************************************************/
 void Adafruit_SharpMem::clearDisplay() {
-  memset(sharpmem_buffer, 0xff, (WIDTH * HEIGHT) / 8);
-
-  spidev->beginTransaction();
-  // Send the clear screen command rather than doing a HW refresh (quicker)
-  digitalWrite(_cs, HIGH);
-
-  uint8_t clear_data[2] = {_sharpmem_vcom | SHARPMEM_BIT_CLEAR, 0x00};
-  spidev->transfer(clear_data, 2);
-
-  TOGGLE_VCOM;
-  digitalWrite(_cs, LOW);
-  spidev->endTransaction();
+  memset(sharpmem_buffer, 0xFF, (WIDTH * HEIGHT) / 8);
+  refresh();
 }
 
 /**************************************************************************/
@@ -234,36 +207,11 @@ void Adafruit_SharpMem::clearDisplay() {
 */
 /**************************************************************************/
 void Adafruit_SharpMem::refresh(void) {
-  uint16_t i, currentline;
 
-  spidev->beginTransaction();
-  // Send the write command
-  digitalWrite(_cs, HIGH);
+  sendCmdAndData(SHARPMEM_CMD_LDIMG,sharpmem_buffer,60000);
 
-  spidev->transfer(_sharpmem_vcom | SHARPMEM_BIT_WRITECMD);
-  TOGGLE_VCOM;
+  transferPanel();
 
-  uint8_t bytes_per_line = WIDTH / 8;
-  uint16_t totalbytes = (WIDTH * HEIGHT) / 8;
-
-  for (i = 0; i < totalbytes; i += bytes_per_line) {
-    uint8_t line[bytes_per_line + 2];
-
-    // Send address byte
-    currentline = ((i + 1) / (WIDTH / 8)) + 1;
-    line[0] = currentline;
-    // copy over this line
-    memcpy(line + 1, sharpmem_buffer + i, bytes_per_line);
-    // Send end of line
-    line[bytes_per_line + 1] = 0x00;
-    // send it!
-    spidev->transfer(line, bytes_per_line + 2);
-  }
-
-  // Send another trailing 8 bits for the last line
-  spidev->transfer(0x00);
-  digitalWrite(_cs, LOW);
-  spidev->endTransaction();
 }
 
 /**************************************************************************/
@@ -272,5 +220,169 @@ void Adafruit_SharpMem::refresh(void) {
 */
 /**************************************************************************/
 void Adafruit_SharpMem::clearDisplayBuffer() {
-  memset(sharpmem_buffer, 0xff, (WIDTH * HEIGHT) / 8);
+  memset(sharpmem_buffer, 0xFF, (WIDTH * HEIGHT) / 8);
 }
+
+/**************************************************************************/
+/*!
+    @brief Start the display
+*/
+/**************************************************************************/
+void Adafruit_SharpMem::enableDisplay() {
+  sendCmd(SHARPMEM_CMD_NORMAL);
+}
+
+/**************************************************************************/
+/*!
+    @brief Shutdown the display
+*/
+/**************************************************************************/
+void Adafruit_SharpMem::disableDisplay() {
+  sendCmd(SHARPMEM_CMD_STBY);
+}
+
+/**************************************************************************/
+/*!
+    @brief Shutdown the display
+*/
+/**************************************************************************/
+void Adafruit_SharpMem::rotationMode(uint8_t rotation) {
+  sendCmd(SHARPMEM_CMD_DISPDIR,rotation);
+}
+
+
+/**************************************************************************/
+/*!
+    @brief Enable Ditering 
+*/
+/**************************************************************************/
+void Adafruit_SharpMem::diteringMode(bool on) {
+  sendCmd(SHARPMEM_CMD_DITHER,on);
+}
+/**************************************************************************/
+/*!
+    @brief Configure Panel Bits
+*/
+/**************************************************************************/
+void Adafruit_SharpMem::panelBits(uint8_t bits) {
+  sendCmd(SHARPMEM_CMD_PRTCLSEL,bits);
+}
+
+/**************************************************************************/
+/*!
+    @brief Enable Ditering 
+*/
+/**************************************************************************/
+void Adafruit_SharpMem::movieMode(bool on) {
+  sendCmd(SHARPMEM_CMD_MOVIE,on);
+}
+
+/**************************************************************************/
+/*!
+    @brief Transfer Data from TCON to Panel
+*/
+/**************************************************************************/
+void Adafruit_SharpMem::transferPanel() {
+  digitalWrite(_cs, LOW);
+  digitalWrite(_rd, HIGH);
+  digitalWrite(_rs, LOW);
+
+  writeParallelBus(SHARPMEM_CMD_DISP);
+
+  //Wait the panel transfer to complete
+  while(digitalRead(_ack) == 0);
+
+  digitalWrite(_cs, HIGH);
+}
+
+/**************************************************************************/
+/*!
+    @brief Send CMD with parameter
+*/
+/**************************************************************************/
+void Adafruit_SharpMem::sendCmd(uint8_t cmd, uint8_t parameter) {
+  digitalWrite(_cs, LOW);
+  digitalWrite(_rd, HIGH);
+  
+  digitalWrite(_rs, LOW);
+  writeParallelBus(cmd);
+
+  digitalWrite(_rs, HIGH);
+  writeParallelBus(parameter);
+  digitalWrite(_cs, HIGH);
+}
+
+/**************************************************************************/
+/*!
+    @brief Send CMD without parameter
+*/
+/**************************************************************************/
+void Adafruit_SharpMem::sendCmd(uint8_t cmd) {
+  digitalWrite(_cs, LOW);
+  digitalWrite(_rd, HIGH);
+  digitalWrite(_rs, LOW);
+
+  writeParallelBus(cmd);
+
+  digitalWrite(_cs, HIGH);
+}
+
+/**************************************************************************/
+/*!
+    @brief Send data array
+*/
+/**************************************************************************/
+void Adafruit_SharpMem::sendCmdAndData(uint8_t cmd, uint8_t* data, uint32_t length) {
+  digitalWrite(_cs, LOW);
+  digitalWrite(_rd, HIGH);
+  digitalWrite(_rs, LOW);
+
+  writeParallelBus(cmd);
+
+  digitalWrite(_rs, HIGH);
+  for (uint32_t i = 0; i < length; ++i)
+  {
+    //Originally I used digital Write to control the WR pins, but it is too slow.
+    //The commented out lines are here to describe the beheavor of the register write.
+    //am_hal_gpio_fastgpio will not be faster because the caching nature of the MCU
+    //am_hal_gpio_fastgpio_set might be faster then the data even though it is execute after bus data write
+    //which will be a problem.
+
+    //am_hal_gpio_fastgpio_clr(_wr);
+    //digitalWrite(_wr, LOW);
+    *wtca = 0x40000FF;
+    //writeParallelBus(data[i]);
+    *wtsa = (uint32_t) data[i];
+    //am_hal_gpio_fastgpio_set(_wr);
+    //digitalWrite(_wr, HIGH);
+    *wtsa = 0x4000000;
+  }
+
+  digitalWrite(_cs, HIGH);
+}
+
+
+/**************************************************************************/
+/*!
+    @brief Write 8bit to parallel bus
+*/
+/**************************************************************************/
+
+
+
+void Adafruit_SharpMem::writeParallelBus(uint8_t data) {
+    //Originally I used digital Write to control the WR pins, but it is too slow.
+    //The commented out lines are here to describe the beheavor of the register write.
+    //am_hal_gpio_fastgpio will not be faster because the caching nature of the MCU
+    //am_hal_gpio_fastgpio_set might be faster then the data even though it is execute after bus data write
+    //which will be a problem.
+
+  //digitalWrite(_wr,LOW);
+  //am_hal_gpio_fastgpio_clr(_wr);
+  *wtca = 0x40000FF; //Also clear bus data
+  *wtsa = (uint32_t) data;
+  *wtsa = 0x4000000; 
+  //digitalWrite(_wr,HIGH);
+  //am_hal_gpio_fastgpio_set(_wr);
+}
+
