@@ -15,8 +15,8 @@ Written by Limor Fried/Ladyada  for Adafruit Industries.
 BSD license, check license.txt for more information
 All text above, and the splash screen must be included in any redistribution
 *********************************************************************/
-#ifndef LIB_SHARPMEM_8BIT
-#define LIB_SHARPMEM_8BIT
+#ifndef LIB_ADAFRUIT_SHARPMEM
+#define LIB_ADAFRUIT_SHARPMEM
 
 #include <Adafruit_GFX.h>
 #include <Arduino.h>
