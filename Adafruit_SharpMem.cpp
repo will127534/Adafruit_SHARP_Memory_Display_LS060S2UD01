@@ -16,7 +16,7 @@ BSD license, check license.txt for more information
 All text above, and the splash screen must be included in any redistribution
 *********************************************************************/
 
-#include "SharpMem_8bit.h"
+#include "Adafruit_SharpMem.h"
 #include "Arduino.h"
 #include "am_mcu_apollo.h"
 #include "am_bsp.h"
